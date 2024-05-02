@@ -2,8 +2,8 @@ import copy
 
 class Cell:
     def __init__(self, numberSeed, numberLarge = 0):
-        self.numberSeed = numberSeed
-        self.numberLarge = numberLarge
+        self.numberSeed: int = numberSeed
+        self.numberLarge: int = numberLarge
     
     def __str__(self):
         return self.value()
@@ -11,11 +11,17 @@ class Cell:
     def emptyCell(self):
         return self.numberSeed == 0 and self.numberLarge == 0
     
-    def value(self):
+    def value(self) -> int:
         return self.numberSeed + self.numberLarge*10
     
     def setSeedZero(self):
         self.numberSeed = 0
+        self.numberLarge = 0
+        
+    def getValue(self):
+        value = copy.deepcopy(self.value())
+        self.setSeedZero()
+        return value
     
     def addOneSeed(self):
         self.numberSeed += 1
@@ -29,8 +35,8 @@ class Board:
         #state of board
         self.playerCells: list[Cell] = [Cell(5), Cell(5), Cell(5), Cell(5), Cell(5)]
         self.opponentCells: list[Cell] = [Cell(5), Cell(5), Cell(5), Cell(5), Cell(5)]
-        self.leftLargeCell = Cell(0, 1)
-        self.rightLargeCell = Cell(0, 1)
+        self.leftLargeCell = Cell(0, 1)    # index: 5 for player, -1 for opponent
+        self.rightLargeCell = Cell(0, 1)   # index: -1 for player, 5 for opponent
     
     def print(self):
         print("---------------------------------------------")
@@ -42,6 +48,9 @@ class Board:
         print(f"|      |  {self.playerCells[0].value()}  |  {self.playerCells[1].value()}  |  {self.playerCells[2].value()}  |  {self.playerCells[4].value()}  |  {self.playerCells[4].value()}  |      |")
         print("|      |     |     |     |     |     |      |")
         print("---------------------------------------------")
+        
+        print("Player:", self.playerSeed)
+        print("Opponent:", self.opponentSeed) 
         
     def terminalState(self):
         if self.leftLargeCell.value() == 0 and self.rightLargeCell.value() == 0:
@@ -56,257 +65,171 @@ class Board:
         playerSeed, opponentSeed = self.terminalState()            
         return playerSeed > opponentSeed
     
-    def leftToRight(self, side: str, index: int, take: bool): # return next index, seed
+    def leftToRight(self, side: str, index: int) -> tuple[str, int, bool]: # return side, next index
+        if side == 'rightMiddle' and index == 5:
+            return 'opponent', 0, False
+        
+        if side == 'rightMiddle' and index == -1:
+            return 'player', 4, False
+        
+        if side == 'leftMiddle' and index == 5:
+            return 'opponent', 4, True
+        
+        if side == 'leftMiddle' and index == -1:
+            return 'player', 0, True
+        
+        if side == 'player' and index + 1 == 5:
+            return 'rightMiddle', -1, False
+        
+        if side == 'opponent' and index - 1 == -1:
+            return 'rightMiddle', 5, False
+        
         if side == 'player':
-            if index == 5:
-                if take:
-                    value = copy.deepcopy(self.rightLargeCell.value())
-                    self.rightLargeCell.setSeedZero()    
-                    return -10, value
-                self.rightLargeCell.addOneSeed()
-                return -10, -1  # start at index 0 of opponent's side
-            
-            if take:
-                value = copy.deepcopy(self.playerCells[index].value())
-                self.playerCells[index].setSeedZero()
-                return index + 1, value
-            else:
-                self.playerCells[index].addOneSeed()
-                return index + 1, -1
-        else:
-            if index == -1:
-                if take:
-                    value = copy.deepcopy(self.rightLargeCell.value())
-                    self.rightLargeCell.setSeedZero()    
-                    return -10, value
-                self.rightLargeCell.addOneSeed()
-                return -4, -1 # start at index 4 of player's side
-            
-            if take:
-                value = copy.deepcopy(self.opponentCells[index].value())
-                self.opponentCells[index].setSeedZero()
-                return index - 1, value
-            else:
-                self.opponentCells[index].addOneSeed()
-                return index - 1, -1
-            
-    def rightToLeft(self, side: str, index: int, take: bool):
+            return side, index + 1, True
+        
+        if side == 'opponent':
+            return side, index - 1, True
+        
+    def rightToLeft(self, side: str, index: int) -> tuple[str, int, bool]: # return next index
+        if side == 'rightMiddle' and index == -1:
+            return 'opponent', 0, False
+        
+        if side == 'rightMiddle' and index == 5:
+            return 'player', 4, False
+        
+        if side == 'leftMiddle' and index == 5:
+            return 'player', 0, True
+        
+        if side == 'leftMiddle' and index == -1:
+            return 'opponent', 4, True
+        
+        if side == 'opponent' and index + 1 == 5:
+            return 'leftMiddle', -1, True
+        
+        if side == 'player' and index - 1 == -1:
+            return 'leftMiddle', 5, True
+        
         if side == 'player':
-            if index == -1:
-                if take:
-                    value = copy.deepcopy(self.leftLargeCell.value())
-                    self.leftLargeCell.setSeedZero()    
-                    return -10, value
-                self.leftLargeCell.addOneSeed()
-                return -4, -1 # start at index 4 of opponent's side
+            return side, index - 1, False
+        
+        if side == 'opponent':
+            return side, index + 1, False
+
+    def handleEmptyCell(self, side: str, index: int, left_to_right: bool) -> int:
+        # bang bang
+        zero = self.playerCells[index].value() if side == 'player' else self.opponentCells[index].value()
+        winSeed = 0
+        
+        while zero == 0:
+            side, nextIndex, left_to_right = self.leftToRight(side, index) if left_to_right else self.rightToLeft(side, index)
             
-            if take:
-                value = copy.deepcopy(self.playerCells[index].value())
-                self.playerCells[index].setSeedZero()
-                return index - 1, value
-            else:
-                self.playerCells[index].addOneSeed()
-                return index - 1, -1
-        else:
-            if index == 5:
-                if take:
-                    value = copy.deepcopy(self.leftLargeCell.value())
-                    self.leftLargeCell.setSeedZero()    
-                    return -10, value
-                self.leftLargeCell.addOneSeed()
-                return -10, -1 # start at index 4 of player's side
+            if side == 'leftMiddle':
+                winSeed += self.leftLargeCell.getValue()
+            elif side == 'rightMiddle':
+                winSeed += self.rightLargeCell.getValue()
+            elif side == 'player':
+                winSeed += self.playerCells[nextIndex].getValue()
+            elif side == 'opponent':
+                winSeed += self.opponentCells[nextIndex].getValue()
+                
+            side, index, left_to_right = self.leftToRight(side, nextIndex) if left_to_right else self.rightToLeft(side, nextIndex)
+            if side == 'leftMiddle' or side == 'rightMiddle':
+                break
+            zero = self.playerCells[index].value() if side == 'player' else self.opponentCells[index].value()
             
-            if take:
-                value = copy.deepcopy(self.opponentCells[index].value())
-                self.opponentCells[index].setSeedZero()
-                return index + 1, value
-            else:
-                self.opponentCells[index].addOneSeed()
-                return index + 1, -1
-    
-    def handleEmptyCell(self, index: int, direction: str, side: str, sideCells: list[Cell], sideSeed: int):
-        if direction == 'LEFT_TO_RIGHT':
-            winSeeds = 0
-            while sideCells[index].value() == 0:
-                index, value = self.leftToRight(side, index, True)
-                self.leftToRight(side, index, True)
-                winSeeds += value
-            sideSeed += winSeeds
-        else:
-            winSeeds = 0
-            while sideCells[index].value() == 0:
-                index, value = self.rightToLeft(side, index, True)
-                self.rightToLeft(side, index, True)
-                winSeeds += value
-            sideSeed += winSeeds
-            
+        return winSeed
+
     def playerMove(self, index: int, direction: str):
         current = self.playerCells[index].value()
         self.playerCells[index].setSeedZero()
-        
-        left_to_right: bool
+        side = 'player'
+        left_to_right = True
         if direction == 'left':
-            index -= 1
             left_to_right = False
-            updateCurrent = False
 
-            while current >= 0:
+        while True:        
+            while current != 0:
                 if left_to_right:
-                    if current == 0:
-                        index, value = self.leftToRight('opponent', index, True)
-                        current = value
-                        updateCurrent = True
-                    else:    
-                        index, value = self.leftToRight('opponent', index, False)
-                    if index < 0: 
-                        left_to_right = False
-                    index = index = 0 if index == -10 else -index if index == -4 else index
-                    
-                    if current == 0:
-                        self.handleEmptyCell(index, 'LEFT_TO_RIGHT' if left_to_right == True else 'RIGHT_TO_LEFT', 'opponent', self.opponentCells, self.playerSeed)
-                        break
+                    side, index, left_to_right = self.leftToRight(side, index)
                 else:
-                    if current == 0:
-                        index, value = self.rightToLeft('player', index, True)
-                        current = value
-                        updateCurrent = True
-                    else:    
-                        index, value = self.rightToLeft('player', index, False)
+                    side, index, left_to_right = self.rightToLeft(side, index)
+                
+                current -= 1
+                if side == 'leftMiddle':
+                    value = self.leftLargeCell.addOneSeed()
+                elif side == 'rightMiddle':
+                    value = self.rightLargeCell.addOneSeed()
+                elif side == 'player':
+                    value = self.playerCells[index].addOneSeed()
+                elif side == 'opponent':
+                    value = self.opponentCells[index].addOneSeed()
+            
+            if left_to_right:
+                side, index, left_to_right = self.leftToRight(side, index)
+            else:
+                side, index, left_to_right = self.rightToLeft(side, index)
                     
-                    if index < 0: 
-                        left_to_right = True
-                    index = index = 0 if index == -10 else -index if index == -4 else index
-                    
-                    if current == 0:
-                        self.handleEmptyCell(index, 'LEFT_TO_RIGHT' if left_to_right == True else 'RIGHT_TO_LEFT', 'player', self.playerCells, self.opponentSeed)
-                        break
-                if updateCurrent:
-                    updateCurrent = False
-                else:
-                    current -= 1
-        else:
-            left_to_right = True
-            index += 1
-            updateCurrent = False
+            if side == 'leftMiddle' or side == 'rightMiddle':
+                break
 
-            while current > 0:
-                if left_to_right:
-                    if current == 0:
-                        index, value = self.leftToRight('player', index, True)
-                        current = value
-                        updateCurrent = True
-                    else:    
-                        index, value = self.leftToRight('player', index, False)
-                    if index < 0: 
-                        left_to_right = False
-                    index = index = 0 if index == -10 else -index if index == -4 else index
-                    
-                    if current == 0:
-                        self.handleEmptyCell(index, 'LEFT_TO_RIGHT' if left_to_right == True else 'RIGHT_TO_LEFT', 'player', self.playerCells, self.opponentSeed)
-                        break
-                else:
-                    if current == 0:
-                        index, value = self.rightToLeft('opponent', index, True)
-                        current = value
-                        updateCurrent = True
-                    else:    
-                        index, value = self.rightToLeft('opponent', index, False)
-                    if index < 0: 
-                        left_to_right = True
-                    index = index = 0 if index == -10 else -index if index == -4 else index
-                    
-                    if current == 0:
-                        self.handleEmptyCell(index, 'LEFT_TO_RIGHT' if left_to_right == True else 'RIGHT_TO_LEFT', 'opponent', self.opponentCells, self.playerSeed)
-                        break
-                if updateCurrent:
-                    updateCurrent = False
-                else:
-                    current -= 1
+            value = -1
+            if side == 'player':
+                value = self.playerCells[index].getValue()
+            elif side == 'opponent':
+                value = self.opponentCells[index].getValue()
+                
+            if value == 0:
+                self.playerSeed += self.handleEmptyCell(side, index, left_to_right)
+                break
+            current = value
+
 
     def opponentMove(self, index: int, direction: str):
         current = self.opponentCells[index].value()
         self.opponentCells[index].setSeedZero()
-        
-        left_to_right: bool
-        if direction == 'right':
-            left_to_right = False
-            index -= 1
-            updateCurrent = False
-
-            while current > 0:
-                if left_to_right:
-                    if current == 0:
-                        index, value = self.leftToRight('opponent', index, True)
-                        current = value
-                        updateCurrent = True
-                    else:    
-                        index, value = self.leftToRight('opponent', index, False)
-                    if index < 0: 
-                        left_to_right = False
-                    index = index = 0 if index == -10 else -index if index == -4 else index
-                    
-                    if current == 0:
-                        self.handleEmptyCell(index, 'LEFT_TO_RIGHT' if left_to_right == True else 'RIGHT_TO_LEFT', 'opponent', self.opponentCells, self.playerSeed)
-                        break
-                else:
-                    if current == 0:
-                        index, value = self.rightToLeft('player', index, True)
-                        current = value
-                        updateCurrent = True
-                    else:    
-                        index, value = self.rightToLeft('player', index, False)
-                    if index < 0: 
-                        left_to_right = True
-                    index = index = 0 if index == -10 else -index if index == -4 else index
-                    
-                    if current == 0:
-                        self.handleEmptyCell(index, 'LEFT_TO_RIGHT' if left_to_right == True else 'RIGHT_TO_LEFT', 'player', self.playerCells, self.opponentSeed)
-                        break
-                if updateCurrent:
-                    updateCurrent = False
-                else:
-                    current -= 1
-        else:
+        side = 'opponent'
+        left_to_right = False
+        if direction == 'left':
             left_to_right = True
-            index += 1
-            updateCurrent = False
 
-            while current > 0:
+        while True:        
+            while current != 0:
                 if left_to_right:
-                    if current == 0:
-                        index, value = self.leftToRight('player', index, True)
-                        current = value
-                        updateCurrent = True
-                    else:    
-                        index, value = self.leftToRight('player', index, False)
-                    
-                    if index < 0: 
-                        left_to_right = False
-                    index = index = 0 if index == -10 else -index if index == -4 else index
-                    
-                    if current == 0:
-                        self.handleEmptyCell(index, 'LEFT_TO_RIGHT' if left_to_right == True else 'RIGHT_TO_LEFT', 'player', self.playerCells, self.opponentSeed)
-                        break
+                    side, index, left_to_right = self.leftToRight(side, index)
                 else:
-                    if current == 0:
-                        index, value = self.rightToLeft('opponent', index, True)
-                        current = value
-                        updateCurrent = True
-                    else:    
-                        index, value = self.rightToLeft('opponent', index, False)
-                    if index < 0: 
-                        left_to_right = True
-                    index = index = 0 if index == -10 else -index if index == -4 else index
+                    side, index, left_to_right = self.rightToLeft(side, index)
+                
+                current -= 1
+                if side == 'leftMiddle':
+                    value = self.leftLargeCell.addOneSeed()
+                elif side == 'rightMiddle':
+                    value = self.rightLargeCell.addOneSeed()
+                elif side == 'player':
+                    value = self.playerCells[index].addOneSeed()
+                elif side == 'opponent':
+                    value = self.opponentCells[index].addOneSeed()
+            
+            if left_to_right:
+                side, index, left_to_right = self.leftToRight(side, index)
+            else:
+                side, index, left_to_right = self.rightToLeft(side, index)
                     
-                    if current == 0:
-                        self.handleEmptyCell(index, 'LEFT_TO_RIGHT' if left_to_right == True else 'RIGHT_TO_LEFT', 'opponent', self.opponentCells, self.playerSeed)
-                        break
-                if updateCurrent:
-                    updateCurrent = False
-                else:
-                    current -= 1
+            if side == 'leftMiddle' or side == 'rightMiddle':
+                break
+
+            value = -1
+            if side == 'player':
+                value = self.playerCells[index].getValue()
+            elif side == 'opponent':
+                value = self.opponentCells[index].getValue()
+                
+            if value == 0:
+                self.opponentSeed += self.handleEmptyCell(side, index, left_to_right)
+                break
+            current = value
+        
 
                 
 board = Board()
-board.playerMove(0, 'left')
+board.opponentMove(1, 'left')
 board.print()
