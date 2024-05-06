@@ -25,6 +25,12 @@ class Cell:
     
     def addOneSeed(self):
         self.numberSeed += 1
+
+class Move():
+    def __init__(self, index: int, direction: str):
+        #direction = "right" | "left"
+        self.index = index
+        self.direction = direction
     
 class Board:
     def __init__(self):
@@ -35,6 +41,10 @@ class Board:
         #state of board
         self.playerCells: list[Cell] = [Cell(5), Cell(5), Cell(5), Cell(5), Cell(5)]
         self.opponentCells: list[Cell] = [Cell(5), Cell(5), Cell(5), Cell(5), Cell(5)]
+        
+        self.borrowPlayer = 0
+        self.borrowOpponent = 0
+        
         self.leftLargeCell = Cell(0, 1)    # index: 5 for player, -1 for opponent
         self.rightLargeCell = Cell(0, 1)   # index: -1 for player, 5 for opponent
     
@@ -43,7 +53,7 @@ class Board:
         print("|      |     |     |     |     |     |      |")
         print(f"|      |  {self.opponentCells[4].value()}  |  {self.opponentCells[3].value()}  |  {self.opponentCells[2].value()}  |  {self.opponentCells[1].value()}  |  {self.opponentCells[0].value()}  |      |")
         print("|      |     |     |     |     |     |      |")
-        print(f"|  {self.leftLargeCell.value()}  |-----------------------------|  {self.rightLargeCell.value()}  |")
+        print(f"|  {self.leftLargeCell.value() if self.leftLargeCell.value() else ' ' + str(self.leftLargeCell.value())}  |-----------------------------|  {self.rightLargeCell.value()}  |")
         print("|      |     |     |     |     |     |      |")
         print(f"|      |  {self.playerCells[0].value()}  |  {self.playerCells[1].value()}  |  {self.playerCells[2].value()}  |  {self.playerCells[4].value()}  |  {self.playerCells[4].value()}  |      |")
         print("|      |     |     |     |     |     |      |")
@@ -58,12 +68,31 @@ class Board:
                 self.playerSeed += self.playerCells[i].value()
                 self.opponentSeed += self.opponentCells[i].value()
                 
-            return self.playerSeed, self.opponentSeed
+            return self.playerSeed - self.borrowPlayer + self.borrowOpponent, self.opponentSeed - self.borrowOpponent + self.borrowPlayer
         return False, False
     
     def winState(self):
         playerSeed, opponentSeed = self.terminalState()            
         return playerSeed > opponentSeed
+    
+    def noSeedAllCells(self, side):
+        if side == 'player':
+            if self.playerSeed < 5:
+                self.borrowPlayer = self.borrowPlayer + 5 - self.playerSeed
+                self.playerSeed = 0
+                self.opponentSeed = self.opponentSeed - (5 - self.playerSeed)
+            
+            for cell in self.playerCells:
+                cell.addOneSeed()
+        
+        else:
+            if self.opponentSeed < 5:
+                self.borrowOpponent = self.borrowOpponent + 5 - self.opponentSeed
+                self.opponentSeed = 0
+                self.playerSeed = self.playerSeed - (5 - self.opponentSeed)
+            
+            for cell in self.opponentCells:
+                cell.addOneSeed()
     
     def leftToRight(self, side: str, index: int) -> tuple[str, int, bool]: # return side, next index
         if side == 'rightMiddle' and index == 5:
@@ -140,6 +169,8 @@ class Board:
         return winSeed
 
     def playerMove(self, index: int, direction: str):
+        self.noSeedAllCells('player')
+        
         current = self.playerCells[index].value()
         self.playerCells[index].setSeedZero()
         side = 'player'
@@ -183,8 +214,9 @@ class Board:
                 break
             current = value
 
-
     def opponentMove(self, index: int, direction: str):
+        self.noSeedAllCells('opponent')
+        
         current = self.opponentCells[index].value()
         self.opponentCells[index].setSeedZero()
         side = 'opponent'
@@ -227,9 +259,4 @@ class Board:
                 self.opponentSeed += self.handleEmptyCell(side, index, left_to_right)
                 break
             current = value
-        
-
                 
-board = Board()
-board.opponentMove(1, 'left')
-board.print()
