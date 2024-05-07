@@ -1,4 +1,7 @@
 import copy
+import sys
+
+sys.setrecursionlimit(10**9 + 10**9)
 
 class Cell:
     def __init__(self, numberSeed, numberLarge = 0):
@@ -74,6 +77,15 @@ class Board:
     def winState(self):
         playerSeed, opponentSeed = self.terminalState()            
         return playerSeed > opponentSeed
+    
+    def isTerminalState(self):
+        return self.leftLargeCell.value() == 0 and self.rightLargeCell.value() == 0
+    
+    def calcPlayerSeed(self):
+        return self.playerSeed - self.borrowPlayer + self.borrowOpponent
+    
+    def calcOpponentSeed(self):
+        return self.opponentSeed - self.borrowOpponent + self.borrowPlayer
     
     def noSeedAllCells(self, side):
         if side == 'player':
@@ -259,4 +271,54 @@ class Board:
                 self.opponentSeed += self.handleEmptyCell(side, index, left_to_right)
                 break
             current = value
+
+
+class minimaxNode:
+    def __init__(self, level: int = 0, playerTurn: int = 0, index: int = 0, position: int = 0, board: Board = None):
+        self.level = level
+        self.playerTurn = playerTurn
+        self.index = index
+        self.position = position
+
+        if playerTurn == 0:
+            self.board = Board()
+        else:
+            self.board = self.build(board)
+        self.value = self.board.calcPlayerSeed() - self.board.calcOpponentSeed()
+        self.threshold = self.value
+
+        self.children = []
+
+    def build(self, board):
+        if self.playerTurn == 1:
+            board.playerMove(self.index, self.position)
+        else:
+            board.opponentMove(self.index, self.position)
+        return board
+    
+    def isLeaf(self):
+        return self.board.isTerminalState()
+    
+class minimaxTree:
+    def __init__(self):
+        self.root = minimaxNode(0)
+        self.maxLevel = 10**10
+        self.build(self.root)
+
+    def build(self, curNode: minimaxNode):
+        if curNode.isLeaf() or curNode.level > self.maxLevel:
+            return
+
+        #build children state
+        for index in range(5):
+            for position in ('left', 'right'):
+                board = copy.deepcopy(curNode.board)
                 
+                if curNode.playerTurn == 0:
+                    newNode = minimaxNode(1, 1, index, position, board)
+                else:
+                    newNode = minimaxNode(curNode.level + 1, -curNode.playerTurn, index, position, board)
+                curNode.children.append(newNode)
+                self.build(newNode)
+
+tree = minimaxTree()
