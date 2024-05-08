@@ -135,7 +135,7 @@ class Board:
         return playerSeed > opponentSeed
     
     def isTerminalState(self):
-        return self.leftLargeCell.value() == 0 and self.rightLargeCell.value() == 0
+        return self.leftLargeCell.value() == 0 and self.rightLargeCell.value() == 0 or self.borrowOpponent >= 36 or self.borrowPlayer >= 36
     
     def calcPlayerSeed(self):
         return self.playerSeed - self.borrowPlayer + self.borrowOpponent
@@ -162,9 +162,9 @@ class Board:
                     return
             
             if self.playerSeed < 5:
-                self.borrowPlayer = self.borrowPlayer + 5 - self.playerSeed
-                self.playerSeed = 5
+                self.borrowPlayer = self.borrowPlayer + 5 - self.playerSeed                
                 self.opponentSeed = self.opponentSeed - (5 - self.playerSeed)
+                self.playerSeed = 5
             
             for i in range(len(self.playerCells)):
                 self.playerSeed -= 1
@@ -177,8 +177,8 @@ class Board:
                 
             if self.opponentSeed < 5:
                 self.borrowOpponent = self.borrowOpponent + 5 - self.opponentSeed
-                self.opponentSeed = 5
                 self.playerSeed = self.playerSeed - (5 - self.opponentSeed)
+                self.opponentSeed = 5
             
             for i in range(len(self.opponentCells)):
                 self.opponentSeed -= 1
@@ -433,24 +433,11 @@ class minimaxTree:
         self.build(self.root)
 
     def build(self, curNode: minimaxNode, visited: set = set()):
-        print("Level, playerTurn, playedIndex, playedPosition:", curNode.level, curNode.playerTurn, curNode.index, curNode.position)
+        print("Level, playerTurn, playedIndex, playedPosition, playerNo, opponentNo:", curNode.level, curNode.playerTurn, curNode.index, curNode.position, curNode.board.borrowPlayer, curNode.board.borrowOpponent)
         curNode.board.print()
         if curNode.isLeaf():
             print("help")
             return
-
-        
-
-        #print()
-        #if (curNode.level == 2):
-            #return
-        #build children state
-        #if (curNode.makeHashString() in visited):
-            #print("cuu")
-        #dct[curNode.makeHashString()] = dct.get(curNode.makeHashString(), 0) + 1
-        #print()
-        
-        #print()
 
         for index in range(5):
             if (curNode.playerTurn == 1 and not curNode.board.shouldOpponentBorrow() and curNode.board.opponentCells[index].value() == 0) or (curNode.playerTurn == -1 and not curNode.board.shouldPlayerBorrow() and curNode.board.playerCells[index].value() == 0):
