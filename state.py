@@ -43,6 +43,9 @@ class Cell:
     def makeHashString(self):
         return str(self.numberSeed) + "-" + str(self.numberLarge)
 
+    def hash(self):
+        return hash((self.numberSeed, self.numberLarge))
+
 class Move():
     def __init__(self, index: int, direction: str):
         #direction = "right" | "left"
@@ -72,6 +75,9 @@ class Board:
         self.opponentNormalPosition = [[], [], [], [], []]
         
         self.initPosition(-1, -1, -1, -1)
+
+    def hash(self):
+        return hash((self.playerCells, self.opponentCells, self.leftLargeCell, self.rightLargeCell))
         
     def initPosition(self, baseX: float, baseY: float, cell_width: float, cell_height: float):
         for _ in range(5):
@@ -383,9 +389,9 @@ class Board:
             current = value
                 
     def makeHashString(self):
-        playerCellsString = "-".join([playerCell.makeHashString() for playerCell in self.playerCells])
-        opponentCellsString = "-".join([opponentCell.makeHashString() for opponentCell in self.opponentCells])
-        return playerCellsString + "-" + opponentCellsString + "-" + self.leftLargeCell.makeHashString() + "-" + self.rightLargeCell.makeHashString()
+        playerCellsString = "#".join([playerCell.makeHashString() for playerCell in self.playerCells])
+        opponentCellsString = "#".join([opponentCell.makeHashString() for opponentCell in self.opponentCells])
+        return "#".join((playerCellsString, opponentCellsString, self.leftLargeCell.makeHashString(), self.rightLargeCell.makeHashString()))
 class minimaxNode:
     def __init__(self, level: int = 0, playerTurn: int = 0, index: int = 0, position: int = 0, board: Board = None):
         self.level = level
@@ -413,27 +419,35 @@ class minimaxNode:
     
     def isLeaf(self):
         return self.board.isTerminalState()
+    
+    def makeHashString(self):
+        return "+".join((str(self.playerTurn), str(self.index), str(self.position), self.board.makeHashString()))
+    
+    def hash(self):
+        return hash((self.playerTurn, self.index, self.position, self.board))
+    
 class minimaxTree:
     def __init__(self):
         self.root = minimaxNode(0)
         self.maxLevel = 10**10
         self.build(self.root)
 
-    def build(self, curNode: minimaxNode):
-        if curNode.isLeaf():
-            print("hello")
-            return
-
+    def build(self, curNode: minimaxNode, visited: set = set()):
         print("Level, playerTurn, playedIndex, playedPosition:", curNode.level, curNode.playerTurn, curNode.index, curNode.position)
         curNode.board.print()
+        if curNode.isLeaf():
+            print("help")
+            return
+
+        
 
         #print()
         #if (curNode.level == 2):
             #return
         #build children state
-        #if (curNode.board.makeHashString() in dct):
+        #if (curNode.makeHashString() in visited):
             #print("cuu")
-        #dct[curNode.board.makeHashString()] = dct.get(curNode.board.makeHashString(), 0) + 1
+        #dct[curNode.makeHashString()] = dct.get(curNode.makeHashString(), 0) + 1
         #print()
         
         #print()
@@ -449,8 +463,11 @@ class minimaxTree:
                     newNode = minimaxNode(1, 1, index, position, board)
                 else:
                     newNode = minimaxNode(curNode.level + 1, -curNode.playerTurn, index, position, board)
-                curNode.children.append(newNode)
-                self.build(newNode)
+                if newNode.makeHashString() not in visited:
+                    visited.add(newNode.makeHashString())
+                    curNode.children.append(newNode)
+                    self.build(newNode, visited)
+                    visited.remove(newNode.makeHashString())
 
 
 orig_stdout = sys.stdout
