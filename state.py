@@ -58,6 +58,9 @@ class Board:
         self.playerSeed = 0      #its me
         self.opponentSeed = 0    #its opponent
         
+        self.playerLargeSeed = 0      #its me
+        self.opponentLargeSeed = 0    #its opponent
+        
         #state of board
         self.playerCells: list[Cell] = [Cell(5), Cell(5), Cell(5), Cell(5), Cell(5)]
         self.opponentCells: list[Cell] = [Cell(5), Cell(5), Cell(5), Cell(5), Cell(5)]
@@ -118,8 +121,8 @@ class Board:
         print("|      |     |     |     |     |     |      |")
         print("---------------------------------------------")
         
-        print("Player:", self.playerSeed)
-        print("Opponent:", self.opponentSeed) 
+        print("Player:", self.playerSeed, self.playerLargeSeed)
+        print("Opponent:", self.opponentSeed, self.opponentLargeSeed) 
         
     def terminalState(self):
         if self.leftLargeCell.value() == 0 and self.rightLargeCell.value() == 0:
@@ -161,12 +164,19 @@ class Board:
                 if self.playerCells[i].value() != 0:
                     return
             
-            if self.playerSeed < 5:
-                self.borrowPlayer = self.borrowPlayer + 5 - self.playerSeed
-                self.playerSeed = 5
-                self.opponentSeed = self.opponentSeed - (5 - self.playerSeed)
+            if (self.playerLargeSeed == 1 and 10 <= self.playerSeed < 15) or (self.playerLargeSeed == 2 and 20 <= self.playerSeed < 25):
+                self.opponentLargeSeed += 1
+                self.playerLargeSeed -= 1
             
-            for i in range(len(self.playerCells)):
+            if self.playerSeed < 5 and self.opponentSeed >= 5 - self.playerSeed:
+                self.borrowPlayer = self.borrowPlayer + 5 - self.playerSeed
+                self.opponentSeed = self.opponentSeed - (5 - self.playerSeed)
+                self.playerSeed = 5
+                        
+            for i in range(5):
+                if self.playerSeed == 0:
+                    break
+                
                 self.playerSeed -= 1
                 self.playerCells[i].addOneSeed()
         
@@ -175,16 +185,22 @@ class Board:
                 if self.opponentCells[i].value() != 0:
                     return
                 
-            if self.opponentSeed < 5:
+            if (self.opponentLargeSeed == 1 and 10 <= self.opponentSeed < 15) or (self.opponentLargeSeed == 2 and 20 <= self.opponentSeed < 25):
+                self.playerLargeSeed += 1
+                self.opponentLargeSeed -= 1
+                
+            if self.opponentSeed < 5 and self.playerSeed >= 5 - self.opponentSeed:
                 self.borrowOpponent = self.borrowOpponent + 5 - self.opponentSeed
-                self.opponentSeed = 5
                 self.playerSeed = self.playerSeed - (5 - self.opponentSeed)
+                self.opponentSeed = 5
             
-            for i in range(len(self.opponentCells)):
+            for ii in range(5):
+                if self.opponentSeed == 0:
+                    break
+                
                 self.opponentSeed -= 1
                 self.opponentCells[i].addOneSeed()
-                
-                
+                            
     def leftToRight(self, side: str, index: int) -> tuple[str, int, bool]: # return side, next index
         if side == 'rightMiddle' and index == 5:
             return 'opponent', 0, False
@@ -269,6 +285,9 @@ class Board:
         return winSeed
 
     def playerMove(self, index: int, direction: str):
+        leftLargeBelong = not (self.leftLargeCell.numberLarge > 0)
+        rightLargeBelong = not (self.rightLargeCell.numberLarge > 0)
+        
         self.noSeedAllCells('player')
         
         if self.playerCells[index].value() == 0:
@@ -327,8 +346,16 @@ class Board:
                 self.playerSeed += self.handleEmptyCell(side, index, left_to_right)
                 break
             current = value
+            
+        if (not leftLargeBelong and self.leftLargeCell.numberLarge == 0 ):
+            self.playerLargeSeed += 1
+        if (not rightLargeBelong and self.rightLargeCell.numberLarge == 0):
+            self.playerLargeSeed += 1
 
     def opponentMove(self, index: int, direction: str):
+        leftLargeBelong = not (self.leftLargeCell.numberLarge > 0)
+        rightLargeBelong = not (self.rightLargeCell.numberLarge > 0)
+        
         self.noSeedAllCells('opponent')
         
         if self.opponentCells[index].value() == 0:
@@ -387,6 +414,11 @@ class Board:
                 self.opponentSeed += self.handleEmptyCell(side, index, left_to_right)
                 break
             current = value
+        
+        if (not leftLargeBelong and self.leftLargeCell.numberLarge == 0 ):
+            self.playerLargeSeed += 1
+        if (not rightLargeBelong and self.rightLargeCell.numberLarge == 0):
+            self.playerLargeSeed += 1
                 
     def makeHashString(self):
         playerCellsString = "#".join([playerCell.makeHashString() for playerCell in self.playerCells])
@@ -394,6 +426,10 @@ class Board:
         return "#".join((playerCellsString, opponentCellsString, self.leftLargeCell.makeHashString(), self.rightLargeCell.makeHashString()))
 class minimaxNode:
     def __init__(self, level: int = 0, playerTurn: int = 0, index: int = 0, position: int = 0, board: Board = None):
+        if board is not None and (board.borrowOpponent >= 36 or board.borrowPlayer >= 36):
+            board.leftLargeCell.setSeedZero()
+            board.rightLargeCell.setSeedZero()
+            
         self.level = level
         self.playerTurn = playerTurn
         self.index = index
@@ -439,8 +475,6 @@ class minimaxTree:
             print("help")
             return
 
-        
-
         #print()
         #if (curNode.level == 2):
             #return
@@ -453,7 +487,10 @@ class minimaxTree:
         #print()
 
         for index in range(5):
-            if (curNode.playerTurn == 1 and not curNode.board.shouldOpponentBorrow() and curNode.board.opponentCells[index].value() == 0) or (curNode.playerTurn == -1 and not curNode.board.shouldPlayerBorrow() and curNode.board.playerCells[index].value() == 0):
+            # if (curNode.playerTurn == 1 and not curNode.board.shouldOpponentBorrow() and curNode.board.opponentCells[index].value() == 0) or (curNode.playerTurn == -1 and not curNode.board.shouldPlayerBorrow() and curNode.board.playerCells[index].value() == 0):
+            #     continue
+            
+            if (curNode.playerTurn == 1 and curNode.board.opponentCells[index].value() == 0) or (curNode.playerTurn == -1 and curNode.board.playerCells[index].value() == 0):
                 continue
             
             for position in ('left', 'right'):
@@ -463,6 +500,7 @@ class minimaxTree:
                     newNode = minimaxNode(1, 1, index, position, board)
                 else:
                     newNode = minimaxNode(curNode.level + 1, -curNode.playerTurn, index, position, board)
+                    
                 if newNode.makeHashString() not in visited:
                     visited.add(newNode.makeHashString())
                     curNode.children.append(newNode)
