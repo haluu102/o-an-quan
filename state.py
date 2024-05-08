@@ -1,7 +1,13 @@
 import copy
 import sys
+import random
 
 sys.setrecursionlimit(10**9 + 10**9)
+
+def random_point(minX: float, maxX: float, minY: float, maxY: float):
+    x = random.uniform(minX, maxX)
+    y = random.uniform(minY, maxY)
+    return x, y
 
 class Cell:
     def __init__(self, numberSeed, numberLarge = 0):
@@ -13,6 +19,9 @@ class Cell:
     
     def emptyCell(self):
         return self.numberSeed == 0 and self.numberLarge == 0
+    
+    def numberOfSeed(self):
+        return self.numberSeed + self.numberLarge
     
     def value(self) -> int:
         return self.numberSeed + self.numberLarge*10
@@ -34,7 +43,7 @@ class Move():
         #direction = "right" | "left"
         self.index = index
         self.direction = direction
-    
+
 class Board:
     def __init__(self):
         #declare 2 player's seed
@@ -50,7 +59,43 @@ class Board:
         
         self.leftLargeCell = Cell(0, 1)    # index: 5 for player, -1 for opponent
         self.rightLargeCell = Cell(0, 1)   # index: -1 for player, 5 for opponent
+        
+        self.leftNormalPosition = []
+        self.rightNormalPosition = []
+        
+        self.playerNormalPosition = [[], [], [], [], []]
+        self.opponentNormalPosition = [[], [], [], [], []]
+        
+        self.initPosition(-1, -1, -1, -1)
+        
+    def initPosition(self, baseX: float, baseY: float, cell_width: float, cell_height: float):
+        for _ in range(5):
+            for __ in range(5):
+                x, y = random_point(baseX + 50, baseX + cell_width - 50, baseY + 50, baseY + cell_height - 50)
+                self.opponentNormalPosition[_] += [(x, y)]
+                self.playerNormalPosition[_] += [(x, y + cell_height)]
+            baseX += cell_width
+            
+    def addPosition(self, side: str, x: float, y: float, indexCell: int = -1):
+        if side == 'left':
+            self.leftNormalPosition += [(x, y)]
+        elif side == 'right':
+            self.rightNormalPosition += [(x, y)]
+        elif side == 'player':
+            self.playerNormalPosition[indexCell] += [(x, y)]
+        else:
+            self.opponentNormalPosition[indexCell] += [(x, y)]
     
+    def removePosition(self, side: str, indexCell: int = -1):
+        if side == 'left':
+            self.leftNormalPosition.pop()
+        elif side == 'right':
+            self.rightNormalPosition.pop()
+        elif side == 'player':
+            self.playerNormalPosition[indexCell].pop()
+        else:
+            self.opponentNormalPosition[indexCell].pop()
+            
     def print(self):
         print("---------------------------------------------")
         print("|      |     |     |     |     |     |      |")
@@ -58,7 +103,7 @@ class Board:
         print("|      |     |     |     |     |     |      |")
         print(f"|  {self.leftLargeCell.value() if self.leftLargeCell.value() else ' ' + str(self.leftLargeCell.value())}  |-----------------------------|  {self.rightLargeCell.value()}  |")
         print("|      |     |     |     |     |     |      |")
-        print(f"|      |  {self.playerCells[0].value()}  |  {self.playerCells[1].value()}  |  {self.playerCells[2].value()}  |  {self.playerCells[4].value()}  |  {self.playerCells[4].value()}  |      |")
+        print(f"|      |  {self.playerCells[0].value()}  |  {self.playerCells[1].value()}  |  {self.playerCells[2].value()}  |  {self.playerCells[3].value()}  |  {self.playerCells[4].value()}  |      |")
         print("|      |     |     |     |     |     |      |")
         print("---------------------------------------------")
         
@@ -72,7 +117,7 @@ class Board:
                 self.opponentSeed += self.opponentCells[i].value()
                 
             return self.playerSeed - self.borrowPlayer + self.borrowOpponent, self.opponentSeed - self.borrowOpponent + self.borrowPlayer
-        return False, False
+        return False
     
     def winState(self):
         playerSeed, opponentSeed = self.terminalState()            
@@ -89,23 +134,35 @@ class Board:
     
     def noSeedAllCells(self, side):
         if side == 'player':
+            for i in range(5):
+                if self.playerCells[i].value() != 0:
+                    return
+            
             if self.playerSeed < 5:
                 self.borrowPlayer = self.borrowPlayer + 5 - self.playerSeed
                 self.playerSeed = 0
                 self.opponentSeed = self.opponentSeed - (5 - self.playerSeed)
             
-            for cell in self.playerCells:
-                cell.addOneSeed()
+            for i in range(len(self.playerCells)):
+                self.playerSeed -= 1
+                self.playerCells[i].addOneSeed()
+                self.addPosition('player', -1, -1, i)
         
         else:
+            for i in range(5):
+                if self.opponentCells[i].value() != 0:
+                    return
+                
             if self.opponentSeed < 5:
                 self.borrowOpponent = self.borrowOpponent + 5 - self.opponentSeed
                 self.opponentSeed = 0
                 self.playerSeed = self.playerSeed - (5 - self.opponentSeed)
             
-            for cell in self.opponentCells:
-                cell.addOneSeed()
-    
+            for i in range(len(self.opponentCells)):
+                self.opponentSeed -= 1
+                self.opponentCells[i].addOneSeed()
+                self.addPosition('opponent', -1, -1, i)
+                
     def leftToRight(self, side: str, index: int) -> tuple[str, int, bool]: # return side, next index
         if side == 'rightMiddle' and index == 5:
             return 'opponent', 0, False
@@ -164,15 +221,24 @@ class Board:
         while zero == 0:
             side, nextIndex, left_to_right = self.leftToRight(side, index) if left_to_right else self.rightToLeft(side, index)
             
+            nextWin = 0
             if side == 'leftMiddle':
-                winSeed += self.leftLargeCell.getValue()
+                nextWin = self.leftLargeCell.getValue()
+                self.removePosition('left', nextIndex)
             elif side == 'rightMiddle':
-                winSeed += self.rightLargeCell.getValue()
+                nextWin = self.rightLargeCell.getValue()
+                self.removePosition('right', nextIndex)
             elif side == 'player':
-                winSeed += self.playerCells[nextIndex].getValue()
+                nextWin = self.playerCells[nextIndex].getValue()
+                self.removePosition('player', nextIndex)
             elif side == 'opponent':
-                winSeed += self.opponentCells[nextIndex].getValue()
-                
+                nextWin = self.opponentCells[nextIndex].getValue()
+                self.removePosition('opponent', nextIndex)
+            
+            if nextWin == 0:
+                return winSeed
+            
+            winSeed += nextWin    
             side, index, left_to_right = self.leftToRight(side, nextIndex) if left_to_right else self.rightToLeft(side, nextIndex)
             if side == 'leftMiddle' or side == 'rightMiddle':
                 break
@@ -183,8 +249,13 @@ class Board:
     def playerMove(self, index: int, direction: str):
         self.noSeedAllCells('player')
         
+        if self.playerCells[index].value() == 0:
+            raise Exception("Ô không có quân, chọn ô khác")
+        
         current = self.playerCells[index].value()
         self.playerCells[index].setSeedZero()
+        self.removePosition('player', index)
+        
         side = 'player'
         left_to_right = True
         if direction == 'left':
@@ -199,13 +270,20 @@ class Board:
                 
                 current -= 1
                 if side == 'leftMiddle':
-                    value = self.leftLargeCell.addOneSeed()
+                    self.leftLargeCell.addOneSeed()
+                    self.addPosition('left', -1, -1)
+                    
                 elif side == 'rightMiddle':
-                    value = self.rightLargeCell.addOneSeed()
+                    self.rightLargeCell.addOneSeed()
+                    self.addPosition('right', -1, -1)
+                    
                 elif side == 'player':
-                    value = self.playerCells[index].addOneSeed()
+                    self.playerCells[index].addOneSeed()
+                    self.addPosition('player', -1, -1, index)
+                    
                 elif side == 'opponent':
-                    value = self.opponentCells[index].addOneSeed()
+                    self.opponentCells[index].addOneSeed()
+                    self.addPosition('opponent', -1, -1, index)
             
             if left_to_right:
                 side, index, left_to_right = self.leftToRight(side, index)
@@ -218,8 +296,10 @@ class Board:
             value = -1
             if side == 'player':
                 value = self.playerCells[index].getValue()
+                self.removePosition('player', index)
             elif side == 'opponent':
                 value = self.opponentCells[index].getValue()
+                self.removePosition('opponent', index)
                 
             if value == 0:
                 self.playerSeed += self.handleEmptyCell(side, index, left_to_right)
@@ -229,8 +309,13 @@ class Board:
     def opponentMove(self, index: int, direction: str):
         self.noSeedAllCells('opponent')
         
+        if self.opponentCells[index].value() == 0:
+            raise Exception("Ô không có quân, chọn ô khác")
+        
         current = self.opponentCells[index].value()
         self.opponentCells[index].setSeedZero()
+        self.removePosition('opponent', index)
+        
         side = 'opponent'
         left_to_right = False
         if direction == 'left':
@@ -245,13 +330,20 @@ class Board:
                 
                 current -= 1
                 if side == 'leftMiddle':
-                    value = self.leftLargeCell.addOneSeed()
+                    self.leftLargeCell.addOneSeed()
+                    self.addPosition('left', -1, -1)
+
                 elif side == 'rightMiddle':
-                    value = self.rightLargeCell.addOneSeed()
+                    self.rightLargeCell.addOneSeed()
+                    self.addPosition('right', -1, -1)
+                    
                 elif side == 'player':
-                    value = self.playerCells[index].addOneSeed()
+                    self.playerCells[index].addOneSeed()
+                    self.addPosition('player', -1, -1, index)
+
                 elif side == 'opponent':
-                    value = self.opponentCells[index].addOneSeed()
+                    self.opponentCells[index].addOneSeed()
+                    self.addPosition('opponent', -1, -1, index)
             
             if left_to_right:
                 side, index, left_to_right = self.leftToRight(side, index)
@@ -264,15 +356,16 @@ class Board:
             value = -1
             if side == 'player':
                 value = self.playerCells[index].getValue()
+                self.removePosition('player', index)
             elif side == 'opponent':
                 value = self.opponentCells[index].getValue()
+                self.removePosition('opponent', index)
                 
             if value == 0:
                 self.opponentSeed += self.handleEmptyCell(side, index, left_to_right)
                 break
             current = value
-
-
+                
 class minimaxNode:
     def __init__(self, level: int = 0, playerTurn: int = 0, index: int = 0, position: int = 0, board: Board = None):
         self.level = level
@@ -284,12 +377,13 @@ class minimaxNode:
             self.board = Board()
         else:
             self.board = self.build(board)
+            
         self.value = self.board.calcPlayerSeed() - self.board.calcOpponentSeed()
         self.threshold = self.value
 
         self.children = []
 
-    def build(self, board):
+    def build(self, board) -> Board:
         if self.playerTurn == 1:
             board.playerMove(self.index, self.position)
         else:
@@ -298,7 +392,6 @@ class minimaxNode:
     
     def isLeaf(self):
         return self.board.isTerminalState()
-    
 class minimaxTree:
     def __init__(self):
         self.root = minimaxNode(0)
@@ -311,6 +404,12 @@ class minimaxTree:
 
         #build children state
         for index in range(5):
+            if curNode.playerTurn and curNode.board.playerCells[index] == 0:
+                continue
+            
+            if curNode.playerTurn == 0 and curNode.board.opponentCells[index] == 0:
+                continue
+            
             for position in ('left', 'right'):
                 board = copy.deepcopy(curNode.board)
                 
