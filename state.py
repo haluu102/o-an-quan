@@ -25,10 +25,10 @@ def random_point(side: str, index: int = -1):
     x, y = -1, -1
     if side == 'left':
         x = random.uniform(BASE_X + 50, BASE_X + CELL_WIDTH - 50)
-        y = random.uniform(BASE_Y + 50, BASE_Y + CELL_HEIGHT*2 - 50)
+        y = random.uniform(BASE_Y + 50, BASE_Y + CELL_HEIGHT*2 - 80)
     if side == 'right':
         x = random.uniform(BASE_X + 6*CELL_WIDTH + 50, BASE_X + 7*CELL_WIDTH - 50)
-        y = random.uniform(BASE_Y + 50, BASE_Y + CELL_HEIGHT*2 - 50)
+        y = random.uniform(BASE_Y + 50, BASE_Y + CELL_HEIGHT*2 - 80)
     
     if side == 'opponent':
         index = 5 - index
@@ -116,7 +116,7 @@ class Board:
                 x = random.uniform(baseX + 50, baseX + cell_width - 50)
                 y = random.uniform(baseY + 50, baseY + cell_height - 50)
                 
-                self.opponentNormalPosition[_] += [(x, y)]
+                self.opponentNormalPosition[4 - _] += [(x, y)]
                 self.playerNormalPosition[_] += [(x, y + cell_height)]
             baseX += cell_width
             
@@ -143,23 +143,24 @@ class Board:
             self.opponentNormalPosition[indexCell] = []
             
     def print(self):
-        print("---------------------------------------------")
-        print("|      |     |     |     |     |     |      |")
-        print(f"|      |  {self.opponentCells[4].value()}  |  {self.opponentCells[3].value()}  |  {self.opponentCells[2].value()}  |  {self.opponentCells[1].value()}  |  {self.opponentCells[0].value()}  |      |")
-        print("|      |     |     |     |     |     |      |")
-        print(f"|  {self.leftLargeCell.value() if self.leftLargeCell.value() else ' ' + str(self.leftLargeCell.value())}  |-----------------------------|  {self.rightLargeCell.value()}  |")
-        print("|      |     |     |     |     |     |      |")
-        print(f"|      |  {self.playerCells[0].value()}  |  {self.playerCells[1].value()}  |  {self.playerCells[2].value()}  |  {self.playerCells[3].value()}  |  {self.playerCells[4].value()}  |      |")
-        print("|      |     |     |     |     |     |      |")
-        print("---------------------------------------------")
+        # print("---------------------------------------------")
+        # print("|      |     |     |     |     |     |      |")
+        # print(f"|      |  {self.opponentCells[4].value()}  |  {self.opponentCells[3].value()}  |  {self.opponentCells[2].value()}  |  {self.opponentCells[1].value()}  |  {self.opponentCells[0].value()}  |      |")
+        # print("|      |     |     |     |     |     |      |")
+        # print(f"|  {self.leftLargeCell.value() if self.leftLargeCell.value() else ' ' + str(self.leftLargeCell.value())}  |-----------------------------|  {self.rightLargeCell.value()}  |")
+        # print("|      |     |     |     |     |     |      |")
+        # print(f"|      |  {self.playerCells[0].value()}  |  {self.playerCells[1].value()}  |  {self.playerCells[2].value()}  |  {self.playerCells[3].value()}  |  {self.playerCells[4].value()}  |      |")
+        # print("|      |     |     |     |     |     |      |")
+        # print("---------------------------------------------")
         
-        # opponentO = copy.deepcopy(self.opponentNormalPosition)
-        # opponentO.reverse()
+        opponentO = copy.deepcopy(self.opponentNormalPosition)
+        opponentO.reverse()
         
-        # print(self.leftNormalPosition)
-        # print(opponentO)
-        # print(self.playerNormalPosition)
-        # print(self.rightNormalPosition)
+        print(self.leftNormalPosition)
+        print(opponentO)
+        print(self.playerNormalPosition)
+        print(self.rightNormalPosition)
+        
         print(self.leftLargeCell.numberLarge, self.leftLargeCell.numberSeed)
         print(self.rightLargeCell.numberLarge, self.rightLargeCell.numberSeed)
         
@@ -196,6 +197,11 @@ class Board:
     
     def calcOpponentSeed(self):
         return self.opponentSeed - self.borrowOpponent + self.borrowPlayer
+    
+    def winner(self):
+        if self.calcPlayerSeed() > self.calcOpponentSeed():
+            return "PLAYER"
+        return "OPPONENT"
     
     def shouldPlayerBorrow(self):
         for i in range(5):
@@ -319,11 +325,11 @@ class Board:
                 
             elif side == 'player':
                 nextWin = self.playerCells[nextIndex].getValue()
-                self.removeAllPosition('player', index)
+                self.removeAllPosition('player', nextIndex)
                 
             elif side == 'opponent':
                 nextWin = self.opponentCells[nextIndex].getValue()
-                self.removeAllPosition('opponent', index)
+                self.removeAllPosition('opponent', nextIndex)
             
             if nextWin == 0:
                 return winSeed
@@ -345,9 +351,8 @@ class Board:
         if self.playerCells[index].value() == 0:
             raise EmptyCellException('player', index)
         
-        current = self.playerCells[index].value()
-        self.playerCells[index].setSeedZero()
-        
+        current = self.playerCells[index].getValue()
+        self.removeAllPosition('player', index)
         
         side = 'player'
         left_to_right = True
@@ -416,9 +421,8 @@ class Board:
         if self.opponentCells[index].value() == 0:
             raise EmptyCellException('opponent', index)
         
-        current = self.opponentCells[index].value()
-        self.opponentCells[index].setSeedZero()
-        
+        current = self.opponentCells[index].getValue()
+        self.removeAllPosition('opponent', index)        
         
         side = 'opponent'
         left_to_right = False
@@ -553,11 +557,11 @@ class minimaxTree:
                     visited.remove(newNode.makeHashString())
 
 
-orig_stdout = sys.stdout
-f = open('out.txt', 'w')
-sys.stdout = f
-tree = minimaxTree()
-sys.stdout = orig_stdout
-f.close()
+# orig_stdout = sys.stdout
+# f = open('out.txt', 'w')
+# sys.stdout = f
+# tree = minimaxTree()
+# sys.stdout = orig_stdout
+# f.close()
 
 # print(dct)
