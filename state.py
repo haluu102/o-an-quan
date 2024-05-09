@@ -15,6 +15,10 @@ sys.setrecursionlimit(10**9 + 10**9)
 
 dct = {}
 
+class EmptyCellException(Exception):
+    def __init__(self, side, index):
+        super().__init__(f"Ô {side} {index} không có quân, chọn ô khác")
+
 def random_point(side: str, index: int = -1):
     xAxis = [BASE_X + CELL_WIDTH, BASE_X + 2*CELL_WIDTH, BASE_X + 3*CELL_WIDTH, BASE_X + 4*CELL_WIDTH, BASE_X + 5*CELL_WIDTH, BASE_X + 6*CELL_WIDTH,]
         
@@ -80,14 +84,14 @@ class Board:
     def __init__(self):
         #declare 2 player's seed
         self.playerSeed = 0      #its me
-        self.opponentSeed = 0   #its opponent
+        self.opponentSeed = 0  #its opponent
         
         self.playerLargeSeed = 0      #its me
         self.opponentLargeSeed = 0    #its opponent
         
         #state of board
-        self.playerCells: list[Cell] = [Cell(5), Cell(5), Cell(5), Cell(5), Cell(5)]
         self.opponentCells: list[Cell] = [Cell(5), Cell(5), Cell(5), Cell(5), Cell(5)]
+        self.playerCells: list[Cell] = [Cell(5), Cell(5), Cell(5), Cell(5), Cell(5)]
         
         self.borrowPlayer = 0
         self.borrowOpponent = 0
@@ -166,37 +170,13 @@ class Board:
         normalSeed =  0
         if side == 'player':
             normalSeed = self.playerSeed - 10*self.playerLargeSeed
-            if normalSeed == 0: return True
+            if normalSeed <= 5: return True
         else:
             normalSeed = self.opponentSeed - 10*self.opponentLargeSeed
-            if normalSeed == 0: return True 
-        return False
-        
-    def terminalState(self, side):
-        playerCanNotBorrow, opponentCanNotBorrow = False, False
-        
-        if side == 'player':
-            playerNormalSeed = self.playerSeed - 10*self.playerLargeSeed
-            playerCanNotBorrow = self.shouldPlayerBorrow() and playerNormalSeed == 0 and self.outOfNormalSeed('opponent')
-        else: 
-            opponentNormalSeed = self.opponentSeed - 10*self.opponentLargeSeed
-            opponentCanNotBorrow = self.shouldOpponentBorrow() and opponentNormalSeed == 0 and self.outOfNormalSeed('player')
-            
-        outOfLargeCell = self.leftLargeCell.value() == 0 and self.rightLargeCell.value() == 0
-
-        if playerCanNotBorrow or opponentCanNotBorrow or outOfLargeCell:
-            for i in range(5):
-                self.playerSeed += self.playerCells[i].value()
-                self.opponentSeed += self.opponentCells[i].value()
-                
-            return self.playerSeed - self.borrowPlayer + self.borrowOpponent, self.opponentSeed - self.borrowOpponent + self.borrowPlayer
+            if normalSeed <= 5: return True 
         return False
     
-    def winState(self):
-        playerSeed, opponentSeed = self.terminalState()            
-        return playerSeed > opponentSeed
-    
-    def isTerminalState(self, side):
+    def isTerminalState(self, side: str, index: int = -1):        
         playerCanNotBorrow, opponentCanNotBorrow = False, False
         
         if side == 'player':
@@ -363,7 +343,7 @@ class Board:
         self.noSeedAllCells('player')
         
         if self.playerCells[index].value() == 0:
-            raise Exception("Ô không có quân, chọn ô khác")
+            raise EmptyCellException('player', index)
         
         current = self.playerCells[index].value()
         self.playerCells[index].setSeedZero()
@@ -434,7 +414,7 @@ class Board:
         self.noSeedAllCells('opponent')
         
         if self.opponentCells[index].value() == 0:
-            raise Exception("Ô không có quân, chọn ô khác")
+            raise EmptyCellException('opponent', index)
         
         current = self.opponentCells[index].value()
         self.opponentCells[index].setSeedZero()
@@ -510,31 +490,36 @@ class minimaxNode:
 
         if playerTurn == 0:
             self.board = Board()
-            self.board.initPosition(-1, -1, -1, -1)
         else:
             self.board = self.build(board)
             
-        self.value = self.board.calcPlayerSeed() - self.board.calcOpponentSeed()
+        self.value = -1000 if self.board is None else self.board.calcPlayerSeed() - self.board.calcOpponentSeed()
         self.threshold = self.value
 
         self.children = []
 
-    def build(self, board) -> Board:
+    def build(self, board: Board) -> Board:        
         if self.playerTurn == 1:
+            if board.playerCells[self.index].value() == 0: return None
             board.playerMove(self.index, self.position)
         else:
+            if board.opponentCells[self.index].value() == 0: return None
             board.opponentMove(self.index, self.position)
         return board
     
-    def isLeaf(self, side):
-        return self.board.isTerminalState(side)
+    def isLeaf(self):
+        if self.board is None: return True
+        return self.board.isTerminalState('player' if self.playerTurn == 1 else 'opponent', self.index)
     
     def makeHashString(self):
+        if self.board is None: return None
         return "+".join((str(self.playerTurn), str(self.index), str(self.position), self.board.makeHashString()))
     
     def hash(self):
         return hash((self.playerTurn, self.index, self.position, self.board))
-    
+
+
+
 class minimaxTree:
     def __init__(self):
         self.root = minimaxNode(0)
@@ -542,32 +527,16 @@ class minimaxTree:
         self.build(self.root)
 
     def build(self, curNode: minimaxNode, visited: set = set()):
-        if curNode.level == 1198:
-            print("hele")
-            
         print("Level, playerTurn, playedIndex, playedPosition:", curNode.level, curNode.playerTurn, curNode.index, curNode.position)
-        curNode.board.print()
-        if curNode.isLeaf('player' if curNode.playerTurn == 1 else 'opponent'):
+        if curNode.board is not None: curNode.board.print()
+        
+        if curNode.isLeaf():
             print("help")
             return
-
-        #print()
-        #if (curNode.level == 2):
-            #return
-        #build children state
-        #if (curNode.makeHashString() in visited):
-            #print("cuu")
-        #dct[curNode.makeHashString()] = dct.get(curNode.makeHashString(), 0) + 1
-        #print()
-        
-        #print()
 
         for index in range(5):
             if (curNode.playerTurn == 1 and not curNode.board.shouldOpponentBorrow() and curNode.board.opponentCells[index].value() == 0) or (curNode.playerTurn == -1 and not curNode.board.shouldPlayerBorrow() and curNode.board.playerCells[index].value() == 0):
                 continue
-            
-            # if (curNode.playerTurn == 1 and curNode.board.opponentCells[index].value() == 0) or (curNode.playerTurn == -1 and curNode.board.playerCells[index].value() == 0):
-            #     continue
             
             for position in ('left', 'right'):
                 board = copy.deepcopy(curNode.board)
@@ -576,7 +545,7 @@ class minimaxTree:
                     newNode = minimaxNode(1, 1, index, position, board)
                 else:
                     newNode = minimaxNode(curNode.level + 1, -curNode.playerTurn, index, position, board)
-                    
+                
                 if newNode.makeHashString() not in visited:
                     visited.add(newNode.makeHashString())
                     curNode.children.append(newNode)
