@@ -1,9 +1,12 @@
 import sys, pygame
 from state import *
 
+CHOOSEN = (220, 20, 60)
+NOT_CHOOSEN = (170, 170, 170)
+
 pygame.init()
 
-size = width, height = 1200, 720
+size = width, height = 1200, 800
 
 pygame.display.set_caption("Ô ĂN QUAN")
 icon = pygame.image.load("assets/large-seed.png")
@@ -27,15 +30,26 @@ def fontText(text):
     text = str(text)
     return pygame.font.SysFont('Corbel', 20) .render(text , True , (0, 0, 0))
 
-def selectMode():
-    pygame.draw.rect(screen, (170, 170, 170), [50, 5, 200, 40]) 
+def selectMode(mode: str):
+    pygame.draw.rect(screen, CHOOSEN if mode == "EASY" else NOT_CHOOSEN, [50, 5, 200, 40]) 
     screen.blit(fontText("EASY") , (70, 15))
     
-    pygame.draw.rect(screen, (170, 170, 170), [50, 50, 200, 40]) 
+    pygame.draw.rect(screen, CHOOSEN if mode == "MEDIUM" else NOT_CHOOSEN, [50, 50, 200, 40]) 
     screen.blit(fontText("MEDIUM") , (70, 60))
     
-    pygame.draw.rect(screen, (170, 170, 170), [50, 95, 200, 40]) 
+    pygame.draw.rect(screen, CHOOSEN if mode == "HARD" else NOT_CHOOSEN, [50, 95, 200, 40]) 
     screen.blit(fontText("HARD") , (70, 105))
+    
+def resetBoard(player: int):
+    pygame.draw.rect(screen, CHOOSEN if player == 1 else NOT_CHOOSEN, [300, 5, 200, 40]) 
+    screen.blit(fontText("PLAYER") , (320, 15))
+    
+    pygame.draw.rect(screen, CHOOSEN if player == -1 else NOT_CHOOSEN, [300, 50, 200, 40]) 
+    screen.blit(fontText("OPPONENT") , (320, 60))
+    
+def startGame():
+    pygame.draw.rect(screen, CHOOSEN if start else NOT_CHOOSEN, [550, 5, 200, 40]) 
+    screen.blit(fontText("START") , (570, 15))
 
 def drawBoard():
     baseX = BASE_X
@@ -86,7 +100,14 @@ def drawSeed(board: Board):
     baseY = BASE_Y
     screen.blit(arrowImages("left"), (baseX + 2.5*CELL_WIDTH , baseY + 400))
     screen.blit(arrowImages("right"), (baseX + 4*CELL_WIDTH , baseY + 400))
+
+def scoreBoard(playerSeed: int, opponentSeed: int):
+    pygame.draw.rect(screen, NOT_CHOOSEN, [BASE_X + 6*CELL_WIDTH, BASE_Y - 50, 100, 40]) 
+    screen.blit(fontText(str(opponentSeed)) , (BASE_X + 6*CELL_WIDTH + 20, BASE_Y - 40))
     
+    pygame.draw.rect(screen, NOT_CHOOSEN, [BASE_X + CELL_WIDTH - 100, BASE_Y + CELL_HEIGHT*2 + 5, 100, 40]) 
+    screen.blit(fontText(str(playerSeed)) , (BASE_X + CELL_WIDTH - 100 + 20, BASE_Y + CELL_HEIGHT*2 + 15))
+
 def getPlayerIndex(x: list[int], y: int, mouse_pos: tuple[int, int]) -> int:
     if x[0] <= mouse_pos[0] <= x[1] and y <= mouse_pos[1] <= y + CELL_HEIGHT: return 0
     if x[1] <= mouse_pos[0] <= x[2] and y <= mouse_pos[1] <= y + CELL_HEIGHT: return 1
@@ -98,9 +119,6 @@ def getPlayerDirection(mouse_pos: tuple[int, int]) -> str:
     if BASE_X + 2.5*CELL_WIDTH <= mouse_pos[0] <= BASE_X + 2.5*CELL_WIDTH + 64 and BASE_Y + 400 <= mouse_pos[1] <= BASE_Y + 400 + 64: return "left"
     if BASE_X + 4*CELL_WIDTH <= mouse_pos[0] <= BASE_X + 4*CELL_WIDTH + 64 and BASE_Y + 400 <= mouse_pos[1] <= BASE_Y + 400 + 64: return "right"
 
-def setMode(mode: str):
-    print(mode)
-
 def showWinner(winner: str):        
     pygame.draw.rect(screen, (170, 170, 170), [(WIDTH - 200)/2, 50, 200, 50]) 
     screen.blit(fontText(winner + "WIN") , ((WIDTH - 200)/2 + 55, 65))
@@ -108,7 +126,14 @@ def showWinner(winner: str):
     trophy = pygame.image.load("assets/trophy.png")
     screen.blit(trophy, ((WIDTH - 200)/2, 50))
     
+start = False
+
 mainBoard = Board()
+minmaxTree = None
+modeLevel = 1
+mode = "EASY"
+
+firstPlayer = 1
 
 playerIndex = None
 playerDirection = None
@@ -119,9 +144,13 @@ finalSide = None
 while True:
     screen.fill((0, 255, 255))
     
-    selectMode()
+    selectMode(mode)
+    resetBoard(firstPlayer)
+    startGame()
+    
     drawBoard()
     drawSeed(mainBoard)
+    scoreBoard(mainBoard.playerSeed, mainBoard.opponentSeed)
     
     xAxis = [BASE_X + CELL_WIDTH, BASE_X + 2*CELL_WIDTH, BASE_X + 3*CELL_WIDTH, BASE_X + 4*CELL_WIDTH,  BASE_X + 5*CELL_WIDTH, BASE_X + 6*CELL_WIDTH]
     yAxis = BASE_Y + CELL_HEIGHT
@@ -131,27 +160,52 @@ while True:
         if event.type == pygame.QUIT: 
             sys.exit()
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            if BASE_X <= mouse_pos[0] <= BASE_X + 7*CELL_WIDTH and BASE_Y <= mouse_pos[1] <= BASE_Y + 2*CELL_HEIGHT:
+            if start and BASE_X <= mouse_pos[0] <= BASE_X + 7*CELL_WIDTH and BASE_Y <= mouse_pos[1] <= BASE_Y + 3*CELL_HEIGHT:
                 if playerClick == 0:
                     playerIndex = getPlayerIndex(xAxis, yAxis, mouse_pos)
                     playerClick = 1
                 else:
                     playerDirection = getPlayerDirection(mouse_pos)
-
-                    if playerIndex is not None and playerDirection is not None:
-                        mainBoard.playerMove(playerIndex, playerDirection)
-                    mainBoard.print()
                     playerClick = 0
+
+                if playerIndex is not None and playerDirection is not None:
+                    print("Player Turn")
+                    print(playerIndex, playerDirection)
+                    mainBoard.playerMove(playerIndex, playerDirection)
+                    mainBoard.print()
+                    
+                    print("Opponent Turn")
+                    minmaxTree = minimaxTree(1, modeLevel, mainBoard)
+                    opponentIndex, opponentDirection = minmaxTree.findBestMove()
+                    print(opponentIndex, opponentDirection)
+                    mainBoard.opponentMove(playerIndex, playerDirection)
+                    
+            
             if 50 <= mouse_pos[0] <= 250 and 5 <= mouse_pos[1] <= 45:
-                setMode("EASY")
+                mode = "EASY"
+                modeLevel = 1
             
             if 50 <= mouse_pos[0] <= 250 and 50 <= mouse_pos[1] <= 90:
-                setMode("MEDIUM")
+                mode = "MEDIUM"
+                modeLevel = 3
                 
             if 50 <= mouse_pos[0] <= 250 and 95 <= mouse_pos[1] <= 135:
-                setMode("HARD")
-    
+                mode = "HARD"
+                modeLevel = 5
+                
+            if 300 <= mouse_pos[0] <= 500 and 5 <= mouse_pos[1] <= 45:
+                firstPlayer = 1
+                mainBoard = Board()
+                
+            if 300 <= mouse_pos[0] <= 500 and 50 <= mouse_pos[1] <= 90:
+                firstPlayer = -1
+                mainBoard = Board()
+                
+            if 550 <= mouse_pos[0] <= 750 and 5 <= mouse_pos[1] <= 45:
+                start = not start
+                print(start)
+
     if mainBoard.isTerminalState(finalSide):
-        showWinner("PLAYER")   
+        showWinner(mainBoard.winner())   
 
     pygame.display.update()
