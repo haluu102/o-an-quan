@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 Level, playerTurn, playedIndex, playedPosition, playerNo, opponentNo: 0 0 0 0 0 0
 ---------------------------------------------
 |      |     |     |     |     |     |      |
@@ -70756,3 +70757,5 @@ Player: 6
 Opponent: 35
 Level, playerTurn, playedIndex, playedPosition, playerNo, opponentNo: 2297 1 0 left 35 35
 ---------------------------------------------
+=======
+>>>>>>> main
