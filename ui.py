@@ -1,5 +1,6 @@
 import sys, pygame
 from state import *
+import time
 
 CHOOSEN = (220, 20, 60)
 NOT_CHOOSEN = (170, 170, 170)
@@ -50,6 +51,9 @@ def resetBoard(player: int):
 def startGame():
     pygame.draw.rect(screen, CHOOSEN if start else NOT_CHOOSEN, [550, 5, 200, 40]) 
     screen.blit(fontText("START") , (570, 15))
+    
+    pygame.draw.rect(screen, CHOOSEN if autoPlay else NOT_CHOOSEN, [550, 50, 200, 40])
+    screen.blit(fontText("AUTO") , (570, 60))
 
 def drawBoard():
     baseX = BASE_X
@@ -120,18 +124,22 @@ def getPlayerDirection(mouse_pos: tuple[int, int]) -> str:
     if BASE_X + 4*CELL_WIDTH <= mouse_pos[0] <= BASE_X + 4*CELL_WIDTH + 64 and BASE_Y + 400 <= mouse_pos[1] <= BASE_Y + 400 + 64: return "right"
 
 def showWinner(winner: str):        
-    pygame.draw.rect(screen, (170, 170, 170), [(WIDTH - 200)/2, 50, 200, 50]) 
-    screen.blit(fontText(winner + "WIN") , ((WIDTH - 200)/2 + 55, 65))
+    pygame.draw.rect(screen, (170, 170, 170), [(WIDTH - 200)/2, BASE_Y - 65, 200, 50]) 
+    screen.blit(fontText(winner) , ((WIDTH - 200)/2 + 55, BASE_Y - 50))
     
     trophy = pygame.image.load("assets/trophy.png")
-    screen.blit(trophy, ((WIDTH - 200)/2, 50))
-    
+    screen.blit(trophy, ((WIDTH - 200)/2, BASE_Y  - 65))
+
+def newGame() -> tuple[Board, bool]:
+    return Board(), True   
 start = False
+firstTurn = True
 
 mainBoard = Board()
 minmaxTree = None
 modeLevel = 1
 mode = "EASY"
+autoPlay = False
 
 firstPlayer = 1
 
@@ -152,9 +160,28 @@ while True:
     drawSeed(mainBoard)
     scoreBoard(mainBoard.playerSeed, mainBoard.opponentSeed)
     
+    
     xAxis = [BASE_X + CELL_WIDTH, BASE_X + 2*CELL_WIDTH, BASE_X + 3*CELL_WIDTH, BASE_X + 4*CELL_WIDTH,  BASE_X + 5*CELL_WIDTH, BASE_X + 6*CELL_WIDTH]
     yAxis = BASE_Y + CELL_HEIGHT
     mouse_pos = pygame.mouse.get_pos()
+    
+    if start and autoPlay and playerTurn:
+        minmaxTree = minimaxTree(-1, 20, mainBoard)
+        firstTurn = False
+        playerIndex, playerDirection = minmaxTree.findBestMove()
+        
+        if playerIndex is not None: 
+            mainBoard.playerMove(playerIndex, playerDirection)
+        playerTurn = False
+        
+    if start and autoPlay and not playerTurn:
+        minmaxTree = minimaxTree(1, modeLevel, mainBoard)
+        firstTurn = False
+        opponentIndex, opponentDirection = minmaxTree.findBestMove()
+        
+        if opponentIndex is not None: 
+            mainBoard.opponentMove(opponentIndex, opponentDirection)
+        playerTurn = True
     
     for event in pygame.event.get():
         if event.type == pygame.QUIT: 
@@ -167,45 +194,53 @@ while True:
                 else:
                     playerDirection = getPlayerDirection(mouse_pos)
                     playerClick = 0
-
-                if playerIndex is not None and playerDirection is not None:
-                    print("Player Turn")
-                    print(playerIndex, playerDirection)
+                
+                if start and playerTurn and playerIndex is not None and playerDirection is not None:
                     mainBoard.playerMove(playerIndex, playerDirection)
-                    mainBoard.print()
+                    playerIndex = None
+                    playerDirection = None
+                    playerTurn = False
                     
-                    print("Opponent Turn")
+                if start and not playerTurn:
                     minmaxTree = minimaxTree(1, modeLevel, mainBoard)
                     opponentIndex, opponentDirection = minmaxTree.findBestMove()
-                    print(opponentIndex, opponentDirection)
-                    mainBoard.opponentMove(playerIndex, playerDirection)
-                    
+                    time.sleep(3)
+                    if opponentIndex is not None: 
+                        mainBoard.opponentMove(opponentIndex, opponentDirection)
+                    playerTurn = True
             
             if 50 <= mouse_pos[0] <= 250 and 5 <= mouse_pos[1] <= 45:
                 mode = "EASY"
                 modeLevel = 1
+                mainBoard = Board()
+                firstTurn = True
             
             if 50 <= mouse_pos[0] <= 250 and 50 <= mouse_pos[1] <= 90:
                 mode = "MEDIUM"
                 modeLevel = 3
+                mainBoard, firstTurn = newGame()
                 
             if 50 <= mouse_pos[0] <= 250 and 95 <= mouse_pos[1] <= 135:
                 mode = "HARD"
                 modeLevel = 5
+                mainBoard, firstTurn = newGame()
                 
             if 300 <= mouse_pos[0] <= 500 and 5 <= mouse_pos[1] <= 45:
                 firstPlayer = 1
-                mainBoard = Board()
+                mainBoard, firstTurn = newGame()
                 
             if 300 <= mouse_pos[0] <= 500 and 50 <= mouse_pos[1] <= 90:
                 firstPlayer = -1
-                mainBoard = Board()
-                
+                mainBoard, firstTurn = newGame()
+            
             if 550 <= mouse_pos[0] <= 750 and 5 <= mouse_pos[1] <= 45:
                 start = not start
-                print(start)
+                playerTurn = True if firstPlayer == 1 else False
+                        
+            if 550 <= mouse_pos[0] <= 750 and 50 <= mouse_pos[1] <= 90:
+                autoPlay = not autoPlay
 
     if mainBoard.isTerminalState(finalSide):
         showWinner(mainBoard.winner())   
-
+        
     pygame.display.update()

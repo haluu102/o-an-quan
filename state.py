@@ -166,7 +166,7 @@ class Board:
         print(self.rightLargeCell.numberLarge, self.rightLargeCell.numberSeed)
         """
         
-        print(self.calcPlayerSeed() - self.calcOpponentSeed())
+        # print(self.calcPlayerSeed() - self.calcOpponentSeed())
         print("Player:", self.playerSeed, self.playerLargeSeed)
         print("Opponent:", self.opponentSeed, self.opponentLargeSeed)
         
@@ -534,19 +534,24 @@ class minimaxTree:
         self.isFound = False
 
     def findBestMove(self):
+        if self.root.isLeaf():
+            return None, None
         value, path = self.build(self.root)
         return path[1].index, path[1].direction
         
     def build(self, curNode: minimaxNode, visited: set = set(), alpha = -10**10, beta = 10**10) -> tuple[int, list[minimaxNode]]:
         if curNode.isLeaf() or self.maxLevel <= curNode.level:
-            if curNode.isLeaf() and curNode.isWin():
-                self.maxLevel = min(self.maxLevel, curNode.level)
+            if curNode.isLeaf():
+                if curNode.isWin():
+                    self.maxLevel = min(self.maxLevel, curNode.level)
             return curNode.value, [curNode]
         
         bestPath = []
-        for index in range(5):            
+
+        for index in range(5):           
             if (curNode.playerTurn == 1 and not curNode.board.shouldOpponentBorrow() and curNode.board.opponentCells[index].value() == 0) or (curNode.playerTurn == -1 and not curNode.board.shouldPlayerBorrow() and curNode.board.playerCells[index].value() == 0):
                 continue
+            newValue = None
             
             for direction in ('left', 'right'):
                 board = copy.deepcopy(curNode.board)
@@ -560,16 +565,25 @@ class minimaxTree:
                     visited.remove(newNode.makeHashString())
 
                     if curNode.playerTurn == 1:
-                        if alpha < newValue:
+                        if curNode.level == 0:
+                            if beta > newValue:
+                                beta = newValue
+                                bestPath = newPath
+                        elif alpha < newValue:
                             alpha = newValue
                             bestPath = newPath
                     else:
-                        if beta > newValue:
+                        if curNode.level == 0:
+                            if alpha < newValue:
+                                alpha = newValue
+                                bestPath = newPath
+                        elif beta > newValue:
                             beta = newValue
                             bestPath = newPath
 
                 if alpha >= beta:   
-                    break   
+                    break
+
         # print (curNode.level, curNode.playerTurn, alpha, beta)
         
         if curNode.playerTurn == 1:
@@ -581,8 +595,28 @@ class minimaxTree:
 # f = open('out.txt', 'w')
 # sys.stdout = f
 # board = Board()
-# tree = minimaxTree(1, 1, board)
-# print(tree.findBestMove())
-# sys.stdout = orig_stdout
+# board.print()
+
+# playerTurn = -1
+# start = True
+
+# while not board.isTerminalState('player' if playerTurn == 1 else 'opponent'):
+#     tree = minimaxTree(-playerTurn, 20, board) if playerTurn == 1 else minimaxTree(-playerTurn, 5, board)
+#     start = False
+#     index, direction = tree.findBestMove()
+    
+#     print("player, index, direction: ", playerTurn, index, direction)
+#     if playerTurn == 1:
+#         board.playerMove(index, direction)
+#         playerTurn = -1
+#     else:
+#         board.opponentMove(index, direction)
+#         playerTurn = 1    
+#     board.print()
+
+# sys.stdout = orig_stdout    
 # f.close()
-#print(dct)
+
+# print(board.winner())    
+
+# print(dct)
